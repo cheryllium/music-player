@@ -3,8 +3,11 @@ import (
   "os"
   "log"
   "time"
+  "fmt"
   "strings"
 
+  tea "github.com/charmbracelet/bubbletea"
+  
   "github.com/faiface/beep"
   "github.com/faiface/beep/wav"
   "github.com/faiface/beep/mp3"
@@ -15,11 +18,13 @@ import (
 var ctrl *beep.Ctrl
 var format beep.Format
 var streamer beep.StreamSeekCloser
+var initialized bool = false
 
 // Play a song
-func playSong(song *Song, done chan bool) {
+func playSong(song *Song, playNext chan bool, p *tea.Program) {
   f, err := os.Open(song.FilePath)
   if err != nil {
+    fmt.Println(err)
     log.Fatal(err)
   }
 
@@ -37,16 +42,47 @@ func playSong(song *Song, done chan bool) {
     log.Fatal(err)
   }
 
-  speaker.Init(format.SampleRate, format.SampleRate.N(time.Second/10))
-  ctrl = &beep.Ctrl{Streamer: streamer, Paused: false}
+  speaker.Clear()
+  if(!initialized) {
+    speaker.Init(format.SampleRate, format.SampleRate.N(time.Second/10))
+    initialized = true
+  }
+
+  speaker.Lock()
+
+  ctrl = &beep.Ctrl{
+    Streamer: beep.Seq(streamer, beep.Callback(func () {
+      // Hacky workaround for erroneous callbacks
+      // Sometimes this callback runs for a skipped song when I press the skip button, idk why
+      // This will simply ignore that case
+      position := format.SampleRate.D(streamer.Position()).Round(time.Second)
+      length := format.SampleRate.D(streamer.Len()).Round(time.Second)
+      if(position != length) {
+        return
+      }
+      // -- End hacky workaround
+      
+      streamer.Close()
+      playNext <- true
+    })),
+    Paused: false,
+  }
+  speaker.Unlock()
   
-  speaker.Play(beep.Seq(ctrl, beep.Callback(func () {
-    done <- true
-  })))
+  speaker.Play(ctrl)
+
+  p.Send(ChangeSongMsg(song))
+  position := format.SampleRate.D(streamer.Position()).Round(time.Second)
+  length := format.SampleRate.D(streamer.Len()).Round(time.Second)
+  
+  p.Send(ChangeDurationMsg{
+    duration: length,
+    position: position,
+  })
 }
 
 // Main function
-func PlayerLoop(messages chan string){
+func PlayerLoop(p *tea.Program, messages chan string){
   // Create the channel
   playNext := make(chan bool, 1)
   playNext <- true
@@ -63,7 +99,7 @@ func PlayerLoop(messages chan string){
       if(nextSong == nil) {
         messages <- "pause"
       }
-      playSong(nextSong, playNext)
+      playSong(nextSong, playNext, p)
     case message := <- messages:
       switch message {
       case "pause": 
@@ -78,7 +114,7 @@ func PlayerLoop(messages chan string){
         if(nextSong == nil) {
           messages <- "pause"
         }
-        playSong(nextSong, playNext)
+        playSong(nextSong, playNext, p)
       case "back":
         if(streamer != nil) {
           streamer.Close()
@@ -87,13 +123,18 @@ func PlayerLoop(messages chan string){
         if(prevSong == nil) {
           messages <- "pause"
         }
-        playSong(prevSong, playNext)
+        playSong(prevSong, playNext, p)
       }
     case <-time.After(time.Second):
       speaker.Lock()
 
       position := format.SampleRate.D(streamer.Position()).Round(time.Second)
       length := format.SampleRate.D(streamer.Len()).Round(time.Second)
+      
+      p.Send(ChangeDurationMsg{
+        duration: length,
+        position: position,
+      })
       
       speaker.Unlock()
     }
