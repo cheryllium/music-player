@@ -57,6 +57,7 @@ func playSong(song *Song, playNext chan bool, p *tea.Program) {
       // This will simply ignore that case
       position := format.SampleRate.D(streamer.Position()).Round(time.Second)
       length := format.SampleRate.D(streamer.Len()).Round(time.Second)
+
       if(position != length) {
         return
       }
