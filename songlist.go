@@ -109,12 +109,14 @@ func populateNextUp() {
   }
 }
 
-func ToggleRepeat() {
+func ToggleRepeat() bool {
   repeat = !repeat
+  return repeat
 }
 
-func ToggleShuffle() {
+func ToggleShuffle() bool {
   shuffle = !shuffle
+  return shuffle
 }
 
 func GetNextSong() *Song {

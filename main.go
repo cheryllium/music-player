@@ -24,6 +24,8 @@ type keyMap struct {
   P key.Binding
   N key.Binding
   B key.Binding
+  S key.Binding
+  R key.Binding
   Q key.Binding
 }
 
@@ -32,7 +34,7 @@ func (k keyMap) ShortHelp() []key.Binding {
 }
 func (k keyMap) FullHelp() [][]key.Binding {
   return [][]key.Binding{
-    {k.P, k.Q}, {k.N}, {k.B},
+    {k.P, k.S, k.Q}, {k.N, k.R}, {k.B},
   }
 }
 
@@ -49,6 +51,14 @@ var keys = keyMap{
     key.WithKeys("b"),
     key.WithHelp("b", "back"),
   ),
+  S: key.NewBinding(
+    key.WithKeys("s"),
+    key.WithHelp("s", "toggle shuffle"),
+  ),
+  R: key.NewBinding(
+    key.WithKeys("r"),
+    key.WithHelp("r", "toggle repeat"),
+  ),
   Q: key.NewBinding(
     key.WithKeys("q"),
     key.WithHelp("q", "quit"),
@@ -62,6 +72,8 @@ type model struct {
   progress progress.Model
   duration time.Duration
   position time.Duration
+  shuffle bool
+  repeat bool
 }
 
 func initialModel() model {
@@ -70,6 +82,8 @@ func initialModel() model {
     help: help.New(),
     song: nil,
     progress: progress.New(progress.WithDefaultGradient(), progress.WithoutPercentage()),
+    shuffle: false,
+    repeat: true,
   }
 }
 
@@ -91,6 +105,10 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
       messages <- "next"
     case "b":
       messages <- "back"
+    case "s":
+      m.shuffle = ToggleShuffle()
+    case "r":
+      m.repeat = ToggleRepeat()
     }
   case ChangeSongMsg:
     m.song = msg
@@ -111,13 +129,25 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 func (m model) View() string {
   if(m.song != nil) {
+    shuffleStatus := "OFF"
+    if m.shuffle {
+      shuffleStatus = "ON"
+    }
+
+    repeatStatus := "OFF"
+    if m.repeat {
+      repeatStatus = "ON"
+    }
+    
     return fmt.Sprintf(
-      "%s - %s\n%s [%s / %s]\n%s",
+      "%s - %s\n%s [%s / %s]\nshuffle \033[1m%s\033[0m\trepeat \033[1m%s\033[0m\n%s",
       m.song.Title,
       m.song.Artist,
       m.progress.View(),
       m.position,
       m.duration,
+      shuffleStatus,
+      repeatStatus,
       m.help.FullHelpView(m.keys.FullHelp()),
     )
   }
