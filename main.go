@@ -128,7 +128,18 @@ func (m model) View() string {
 func main() {
   // Read in the first argument to the command; the directory to play music from
   args := os.Args[1:]
-  directory := args[0]
+  
+  var directory string
+  var err error
+  if len(args) < 1 {
+    directory, err = os.Getwd()
+    if err != nil {
+      fmt.Printf("Error getting current working directory: %s\n", err)
+      os.Exit(1)
+    }
+  } else {
+    directory = args[0]
+  }
 
   // Attempt to read the directory
   files, err := os.ReadDir(directory)
@@ -148,6 +159,11 @@ func main() {
     if strings.HasSuffix(file.Name(), ".mp3") || strings.HasSuffix(file.Name(), ".wav") {
       filenames = append(filenames, filepath.Join(directory, file.Name()))
     }
+  }
+
+  if len(filenames) < 1 {
+    fmt.Println("No music files found in the selected directory.")
+    os.Exit(1)
   }
   
   // Initialize the playlist
