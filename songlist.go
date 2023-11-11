@@ -8,6 +8,8 @@ package main
 import (
   "os"
   "path/filepath"
+  "math/rand"
+  "time"
   
   "github.com/dhowden/tag"
 )
@@ -28,7 +30,7 @@ type stack struct {
 func (s *stack) push(elem *Song) {
   s.data = append(s.data, elem)
 }
-func (s * stack) pop() *Song {
+func (s *stack) pop() *Song {
   if(len(s.data) == 0) {
     return nil
   }
@@ -37,6 +39,16 @@ func (s * stack) pop() *Song {
   s.data[n] = nil
   s.data = s.data[:n]
   return elem
+}
+func (s *stack) shuffle() {
+  rand.Seed(time.Now().UnixNano())
+  n := len(s.data)
+  for i:=n-1; i>0; i-- {
+    j := rand.Intn(i)
+    temp := s.data[j]
+    s.data[j] = s.data[i]
+    s.data[i] = temp
+  }
 }
 
 // keeping track of different things
@@ -107,6 +119,10 @@ func populateNextUp() {
   for i := len(playlist) - 1; i >= 0; i-- {
     nextUp.push(playlist[i])
   }
+
+  if shuffle {
+    nextUp.shuffle()
+  }
 }
 
 func ToggleRepeat() bool {
@@ -116,6 +132,7 @@ func ToggleRepeat() bool {
 
 func ToggleShuffle() bool {
   shuffle = !shuffle
+  nextUp.shuffle()
   return shuffle
 }
 
